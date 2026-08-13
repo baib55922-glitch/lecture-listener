@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">课堂提问助手</string>
+    <string name="channel_listener_name">课堂监听</string>
+    <string name="channel_question_name">提问提醒</string>
+</resources>
