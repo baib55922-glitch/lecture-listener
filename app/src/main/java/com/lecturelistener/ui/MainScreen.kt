@@ -48,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -110,7 +111,7 @@ fun MainScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
             TopAppBar(
                 title = {
                     Column {
-                        Text("课堂提问助手")
+                        Text(stringResource(R.string.app_name))
                         Text(
                             when (serviceState) {
                                 ServiceState.LISTENING -> "监听中 · 已识别 ${segments.size} 句"
