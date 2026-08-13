@@ -54,6 +54,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.lecturelistener.R
 import com.lecturelistener.asr.ModelManager
 import com.lecturelistener.data.ServiceState
 import java.text.SimpleDateFormat
