@@ -9,5 +9,6 @@ captures/
 .cxx/
 .tmp/
 large-model/
+gradle/gradle-daemon-jvm.properties
 
 .reasonix/
