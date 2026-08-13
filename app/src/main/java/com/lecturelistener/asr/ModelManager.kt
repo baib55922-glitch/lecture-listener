@@ -45,9 +45,21 @@ object ModelManager {
     private var loadedName: String? = null
 
     private val http = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(120, TimeUnit.SECONDS)
         .build()
+
+    /**
+     * 模型下载源列表（按顺序尝试，第一个连通的生效）。
+     * alphacephei 官方源国内访问不稳定，备选 GitHub 镜像与 ghproxy 加速代理。
+     */
+    private val mirrorBases = listOf(
+        "https://alphacephei.com/vosk/models",
+        "https://raw.githubusercontent.com/kercre123/vosk-models/master",
+        "https://mirror.ghproxy.com/https://raw.githubusercontent.com/kercre123/vosk-models/master",
+        "https://ghproxy.net/https://raw.githubusercontent.com/kercre123/vosk-models/master",
+        "https://gh-proxy.com/https://raw.githubusercontent.com/kercre123/vosk-models/master",
+    )
 
     fun modelDir(ctx: Context, name: String): File =
         File(ctx.getExternalFilesDir(null) ?: ctx.filesDir, "models/$name")
@@ -148,40 +160,54 @@ object ModelManager {
             }
         }
 
-    /** 下载 zip 并解压（带进度） */
+    /** 下载 zip 并解压（多源自动切换 + 进度） */
     private suspend fun downloadLocked(ctx: Context, name: String): Result<Unit> =
         withContext(Dispatchers.IO) {
-            val base = SettingsStore.load(ctx).modelBaseUrl.trimEnd('/')
-            val url = "$base/$name.zip"
+            val custom = SettingsStore.load(ctx).modelBaseUrl.trim().trimEnd('/')
+            val bases = if (custom.isNotBlank()) listOf(custom) + mirrorBases else mirrorBases
             val destDir = modelDir(ctx, name)
             val tmpZip = File(destDir.parentFile, "$name.zip.part")
             try {
-                _state.value = ModelState.Downloading(0)
                 tmpZip.parentFile?.mkdirs()
 
-                val request = Request.Builder().url(url).build()
-                http.newCall(request).execute().use { resp ->
-                    if (!resp.isSuccessful) {
-                        throw IOException("下载失败 HTTP ${resp.code}（地址：$url）")
-                    }
-                    val body = resp.body ?: throw IOException("空响应")
-                    val total = body.contentLength()
-                    var done = 0L
-                    val buf = ByteArray(64 * 1024)
-                    body.byteStream().use { input ->
-                        tmpZip.outputStream().use { out ->
-                            while (true) {
-                                val n = input.read(buf)
-                                if (n <= 0) break
-                                out.write(buf, 0, n)
-                                done += n
-                                if (total > 0) {
-                                    val pct = (done * 95 / total).toInt().coerceIn(0, 95)
-                                    _state.value = ModelState.Downloading(pct)
+                var downloaded = false
+                val errors = StringBuilder()
+                for (base in bases) {
+                    val url = "$base/$name.zip"
+                    try {
+                        _state.value = ModelState.Downloading(0)
+                        val request = Request.Builder().url(url).build()
+                        http.newCall(request).execute().use { resp ->
+                            if (!resp.isSuccessful) throw IOException("HTTP ${resp.code}")
+                            val body = resp.body ?: throw IOException("空响应")
+                            val total = body.contentLength()
+                            var done = 0L
+                            val buf = ByteArray(64 * 1024)
+                            tmpZip.delete() // 清掉上一个失败源的残留
+                            body.byteStream().use { input ->
+                                tmpZip.outputStream().use { out ->
+                                    while (true) {
+                                        val n = input.read(buf)
+                                        if (n <= 0) break
+                                        out.write(buf, 0, n)
+                                        done += n
+                                        if (total > 0) {
+                                            val pct = (done * 95 / total).toInt().coerceIn(0, 95)
+                                            _state.value = ModelState.Downloading(pct)
+                                        }
+                                    }
                                 }
                             }
                         }
+                        downloaded = true
+                        break
+                    } catch (t: Throwable) {
+                        errors.append("$url → ${t.message}\n")
+                        tmpZip.delete()
                     }
+                }
+                if (!downloaded) {
+                    throw IOException("所有下载源均不可用：\n$errors")
                 }
 
                 _state.value = ModelState.Unzipping
