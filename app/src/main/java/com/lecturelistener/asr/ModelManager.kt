@@ -112,7 +112,7 @@ object ModelManager {
         loadedSilenceMs = -1
     }
 
-    /** 逐个下载缺失的模型文件（多源 fallback，总进度百分比） */
+    /** 逐个下载缺失的模型文件（多源 fallback，实时进度） */
     private suspend fun downloadAll(ctx: Context): Result<Unit> = withContext(Dispatchers.IO) {
         val custom = SettingsStore.load(ctx).modelBaseUrl.trim().trimEnd('/')
         val bases = if (custom.isNotBlank()) listOf(custom) + defaultBases else defaultBases
@@ -125,35 +125,20 @@ object ModelManager {
             return@withContext Result.success(Unit)
         }
 
-        // 先探测总大小（用于进度），探测失败则按文件数百分比
-        var totalBytes = 0L
-        val sizes = HashMap<String, Long>()
-        for (f in missing) {
-            var got = 0L
-            for (base in bases) {
-                got = probeSize("$base/$f") ?: 0L
-                if (got > 0) break
-            }
-            if (got > 0) {
-                sizes[f] = got
-                totalBytes += got
-            }
-        }
-
-        var doneBytes = 0L
-        var doneFiles = 0
-        for (f in missing) {
+        val totalFiles = missing.size
+        for ((idx, f) in missing.withIndex()) {
             val target = File(dir, f)
             var ok = false
             val errors = StringBuilder()
             for (base in bases) {
                 val url = "$base/$f"
                 try {
-                    _state.value = ModelState.Downloading(progress(doneBytes, doneFiles, missing.size, totalBytes))
                     val request = Request.Builder().url(url).build()
                     http.newCall(request).execute().use { resp ->
                         if (!resp.isSuccessful) throw IOException("HTTP ${resp.code}")
                         val body = resp.body ?: throw IOException("空响应")
+                        val fileTotal = body.contentLength()
+                        var done = 0L
                         val tmp = File(dir, "$f.part")
                         tmp.delete()
                         body.byteStream().use { input ->
@@ -163,14 +148,19 @@ object ModelManager {
                                     val n = input.read(buf)
                                     if (n <= 0) break
                                     out.write(buf, 0, n)
-                                    doneBytes += n
-                                    _state.value = ModelState.Downloading(
-                                        progress(doneBytes, doneFiles, missing.size, totalBytes),
-                                    )
+                                    done += n
+                                    // 全局进度 = 文件均分 × 文件内进度（第一帧起就有百分比）
+                                    val filePct = if (fileTotal > 0) {
+                                        (done * 100 / fileTotal).toInt().coerceIn(0, 100)
+                                    } else {
+                                        0
+                                    }
+                                    val global = ((idx * 100 + filePct) / totalFiles).coerceIn(0, 99)
+                                    _state.value = ModelState.Downloading(global)
                                 }
                             }
                         }
-                        if (tmp.length() <= 0) throw IOException("下载内容为空")
+                        if (done <= 0) throw IOException("下载内容为空")
                         tmp.renameTo(target)
                     }
                     ok = true
@@ -183,7 +173,6 @@ object ModelManager {
                 _state.value = ModelState.Error("模型下载失败：\n$errors")
                 return@withContext Result.failure(IOException("模型下载失败：$errors"))
             }
-            doneFiles++
         }
 
         if (isReady(ctx)) {
@@ -192,27 +181,6 @@ object ModelManager {
         } else {
             _state.value = ModelState.Error("模型文件不完整，请重试")
             Result.failure(IOException("模型文件不完整"))
-        }
-    }
-
-    private fun progress(doneBytes: Long, doneFiles: Int, totalFiles: Int, totalBytes: Long): Int {
-        val pct = if (totalBytes > 0) {
-            (doneBytes * 100 / totalBytes).toInt()
-        } else {
-            (doneFiles * 100 / totalFiles).toInt()
-        }
-        return pct.coerceIn(0, 99)
-    }
-
-    private fun probeSize(url: String): Long? {
-        return try {
-            val request = Request.Builder().url(url).head().build()
-            http.newCall(request).execute().use { resp ->
-                val len = resp.body?.contentLength() ?: -1
-                if (resp.isSuccessful && len > 0) len else null
-            }
-        } catch (t: Throwable) {
-            null
         }
     }
 }
