@@ -71,7 +71,7 @@ class MainViewModel : ViewModel() {
     }
 
     fun downloadSelectedModel() {
-        viewModelScope.launch { ModelManager.prepare(AppContext.ctx, _settings.value.model) }
+        viewModelScope.launch { ModelManager.prepare(AppContext.ctx) }
     }
 
     fun requestIgnoreBatteryOptimizations(context: Context) {

@@ -4,5 +4,5 @@
 -dontwarn okhttp3.**
 -dontwarn okio.**
 
-# Vosk JNI
--keep class org.vosk.** { *; }
+# sherpa-onnx JNI
+-keep class com.k2fsa.sherpa.onnx.** { *; }

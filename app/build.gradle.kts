@@ -58,8 +58,8 @@ dependencies {
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
-    // 离线语音识别
-    implementation("com.alphacephei:vosk-android:0.3.47")
+    // 离线语音识别（sherpa-onnx：中文优化 Paraformer 流式模型）
+    implementation(files("libs/sherpa-onnx-1.13.5.aar"))
 
     // 网络
     implementation("com.squareup.okhttp3:okhttp:4.12.0")

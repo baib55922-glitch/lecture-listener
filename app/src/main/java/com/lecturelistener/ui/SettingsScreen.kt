@@ -22,7 +22,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -42,7 +41,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lecturelistener.asr.ModelManager
-import com.lecturelistener.data.AppSettings
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,7 +51,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
     val context = LocalContext.current
 
     var keyVisible by remember { mutableStateOf(false) }
-    val modelReady = ModelManager.isReady(context, settings.model)
+    val modelReady = ModelManager.isReady(context)
 
     Scaffold(
         topBar = {
@@ -117,16 +115,12 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
 
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
 
-            SectionTitle("识别模型")
-            ModelChoiceRow(
-                title = "小模型（约 42MB，速度快、省电）",
-                selected = settings.model == AppSettings.MODEL_SMALL,
-                onClick = { vm.updateSettings(settings.copy(model = AppSettings.MODEL_SMALL)) },
-            )
-            ModelChoiceRow(
-                title = "大模型（约 1.3GB，准确率更高）",
-                selected = settings.model == AppSettings.MODEL_LARGE,
-                onClick = { vm.updateSettings(settings.copy(model = AppSettings.MODEL_LARGE)) },
+            SectionTitle("识别模型（中文优化 · Paraformer 双语流式）")
+            Text(
+                "阿里达摩院 Paraformer 体系，中英混合识别，准确率远超旧版 Vosk；" +
+                    "三个文件合计约 226MB，首次使用自动从国内镜像下载（约 1~2 分钟）。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             when (val m = modelState) {
@@ -140,13 +134,6 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
                     Text(
                         "正在下载模型 ${m.pct}%（建议连接 WiFi）",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                is ModelManager.ModelState.Unzipping -> {
-                    Text(
-                        "正在解压模型…",
-                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -175,7 +162,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
                             onClick = { vm.downloadSelectedModel() },
                             enabled = modelState !is ModelManager.ModelState.Downloading,
                         ) {
-                            Text("下载所选模型")
+                            Text("下载识别模型（约 226MB）")
                         }
                     }
                 }
@@ -248,21 +235,6 @@ private fun SectionTitle(text: String) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(vertical = 4.dp),
     )
-}
-
-@Composable
-private fun ModelChoiceRow(title: String, selected: Boolean, onClick: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RadioButton(selected = selected, onClick = null)
-        Spacer(Modifier.width(4.dp))
-        Text(title, style = MaterialTheme.typography.bodyMedium)
-    }
 }
 
 @Composable

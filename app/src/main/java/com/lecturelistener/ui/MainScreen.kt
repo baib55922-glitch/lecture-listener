@@ -145,7 +145,6 @@ fun MainScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
                     StatusBanner(
                         text = when (val m = modelState) {
                             is ModelManager.ModelState.Downloading -> "正在下载识别模型 ${m.pct}%"
-                            is ModelManager.ModelState.Unzipping -> "正在解压模型…"
                             else -> "正在加载识别模型…"
                         },
                         color = MaterialTheme.colorScheme.primaryContainer,
